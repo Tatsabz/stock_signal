@@ -171,7 +171,7 @@ function analyze(df){
 
 async function fetchSymbols(){
     try{
-        let r=await fetch('http://cdn.tsetmc.com/api/Instrument/GetInstrumentList');
+        let r=await fetch('https://corsproxy.io/?http://cdn.tsetmc.com/api/Instrument/GetInstrumentList');
         let d=await r.json();
         return d.instrumentList.filter(i=>i.insCode&&i.lVal30).map(i=>({code:i.insCode,symbol:i.lVal30.trim(),name:(i.lVal18AFC||i.lVal30).trim()}));
     }catch(e){return[];}
@@ -179,7 +179,7 @@ async function fetchSymbols(){
 
 async function fetchData(code){
     try{
-        let r=await fetch(`http://cdn.tsetmc.com/api/ClosingPrice/GetClosingPriceHistory/${code}`);
+        let r=await fetch(`https://corsproxy.io/?http://cdn.tsetmc.com/api/ClosingPrice/GetClosingPriceHistory/${code}`);
         let d=await r.json();
         if(d&&d.closingPriceHistory)return d.closingPriceHistory.map(i=>({date:i.dEven,close:parseFloat(i.pClosing),high:parseFloat(i.priceMax),low:parseFloat(i.priceMin),volume:parseFloat(i.qTotTran5J)}));
     }catch(e){}
