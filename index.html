@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سیگنال بورس</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Tahoma;background:#0a0a0a;color:#fff}
+        .login{max-width:350px;margin:80px auto;padding:30px;background:#1a1a1a;border-radius:15px;text-align:center}
+        .login input{width:100%;padding:12px;margin:8px 0;background:#000;border:1px solid #333;color:#fff;border-radius:8px;text-align:center}
+        .login button{width:100%;padding:12px;background:#FFD700;color:#000;border:none;border-radius:8px;font-weight:bold;cursor:pointer;margin-top:10px}
+        .container{max-width:800px;margin:0 auto;padding:20px;display:none}
+        .header{text-align:center;padding:20px}
+        .header h1{color:#FFD700}
+        .tabs{display:flex;gap:5px;margin:20px 0;flex-wrap:wrap}
+        .tab{padding:10px 20px;background:#1a1a1a;border:none;color:#fff;border-radius:8px;cursor:pointer}
+        .tab.active{background:#FFD700;color:#000;font-weight:bold}
+        .signal-box{padding:15px;border-radius:10px;margin:8px 0;display:flex;justify-content:space-between;align-items:center}
+        .buy{background:linear-gradient(135deg,#0d6b4e,#15a36e)}
+        .sell{background:linear-gradient(135deg,#8b1a2b,#d32f2f)}
+        .neutral{background:#1a1a1a;border:1px solid #333}
+        .gold{background:linear-gradient(135deg,#b8860b,#ffd700);color:#000;font-weight:bold}
+        .symbol{font-size:18px;font-weight:bold}
+        .price{font-size:14px;opacity:0.8}
+        .signal{font-size:16px;font-weight:bold}
+        .score{font-size:24px;font-weight:bold}
+        .loading{text-align:center;padding:40px}
+        .spinner{border:3px solid #333;border-top:3px solid #FFD700;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:0 auto}
+        @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+        .refresh-btn{position:fixed;bottom:20px;right:20px;width:50px;height:50px;background:#FFD700;border:none;border-radius:50%;font-size:24px;cursor:pointer;z-index:100}
+        .search{width:100%;padding:12px;background:#1a1a1a;border:1px solid #333;color:#fff;border-radius:8px;margin:10px 0}
+    </style>
+</head>
+<body>
+
+<div class="login" id="loginBox">
+    <h2 style="color:#FFD700;margin-bottom:20px;">🔒 سیگنال بورس</h2>
+    <input type="text" id="user" placeholder="نام کاربری">
+    <input type="password" id="pass" placeholder="رمز عبور">
+    <button onclick="login()">ورود</button>
+    <p id="error" style="color:red;margin-top:10px;"></p>
+</div>
+
+<div class="container" id="app">
+    <div class="header">
+        <h1>📈 سیگنال هوشمند بورس</h1>
+        <p id="updateTime"></p>
+    </div>
+    
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('all')">همه</button>
+        <button class="tab" onclick="switchTab('gold')">🥇 طلا</button>
+        <button class="tab" onclick="switchTab('buy')">🟢 خرید</button>
+        <button class="tab" onclick="switchTab('sell')">🔴 فروش</button>
+    </div>
+    
+    <input type="text" class="search" id="search" placeholder="🔍 جستجوی نماد..." oninput="filterSignals()">
+    
+    <div id="signalsContainer">
+        <div class="loading">
+            <div class="spinner"></div>
+            <p style="margin-top:20px;">در حال تحلیل بازار...</p>
+        </div>
+    </div>
+</div>
+
+<button class="refresh-btn" onclick="scanMarket()" title="بروزرسانی">🔄</button>
+
+<script>
+const PASSWORD = "Tatsabz#2026";
+const USERNAME = "admin";
+let allSignals = [];
+let currentTab = 'all';
+
+function login(){
+    const u=document.getElementById('user').value;
+    const p=document.getElementById('pass').value;
+    if(u===USERNAME&&p===PASSWORD){
+        document.getElementById('loginBox').style.display='none';
+        document.getElementById('app').style.display='block';
+        scanMarket();
+    }else{
+        document.getElementById('error').textContent='❌ اشتباه است!';
+    }
+}
+
+document.getElementById('pass').addEventListener('keypress',function(e){if(e.key==='Enter')login();});
+
+function calcRSI(closes,period=14){
+    if(closes.length<period+1)return 50;
+    let gains=0,losses=0;
+    for(let i=closes.length-period;i<closes.length;i++){
+        let diff=closes[i]-closes[i-1];
+        if(diff>0)gains+=diff;else losses-=diff;
+    }
+    let avgGain=gains/period,avgLoss=losses/period;
+    if(avgLoss===0)return 100;
+    return 100-(100/(1+avgGain/avgLoss));
+}
+
+function calcMA(closes,period){
+    if(closes.length<period)return closes[closes.length-1];
+    return closes.slice(-period).reduce((a,b)=>a+b,0)/period;
+}
+
+function calcEMA(data,period){
+    if(data.length<period)return data[data.length-1];
+    let k=2/(period+1),ema=data.slice(0,period).reduce((a,b)=>a+b,0)/period;
+    for(let i=period;i<data.length;i++)ema=data[i]*k+ema*(1-k);
+    return ema;
+}
+
+function calcMACD(closes){
+    if(closes.length<26)return{macd:0,signal:0};
+    let ema12=calcEMA(closes,12),ema26=calcEMA(closes,26);
+    let macdArr=[];
+    for(let i=26;i<closes.length;i++){
+        macdArr.push(calcEMA(closes.slice(0,i+1),12)-calcEMA(closes.slice(0,i+1),26));
+    }
+    let signal=macdArr.length>=9?calcEMA(macdArr,9):ema12-ema26;
+    return{macd:ema12-ema26,signal};
+}
+
+function calcBB(closes,period=20){
+    let ma=calcMA(closes,period);
+    let slice=closes.slice(-period);
+    let variance=slice.reduce((a,b)=>a+Math.pow(b-ma,2),0)/period;
+    let std=Math.sqrt(variance);
+    return{upper:ma+2*std,lower:ma-2*std,mid:ma};
+}
+
+function analyze(df){
+    if(!df||df.length<50)return{action:'⚪ داده ناکافی',score:0,signals:[]};
+    let closes=df.map(d=>d.close);
+    let latest=df[df.length-1];
+    let sigs=[],sc=0;
+    
+    let rsi=calcRSI(closes);
+    if(rsi<30){sigs.push(`RSI اشباع فروش (${rsi.toFixed(1)})`);sc+=4;}
+    else if(rsi<40){sigs.push(`RSI پایین (${rsi.toFixed(1)})`);sc+=2;}
+    else if(rsi>70){sigs.push(`RSI اشباع خرید (${rsi.toFixed(1)})`);sc-=4;}
+    else if(rsi>60){sigs.push(`RSI بالا (${rsi.toFixed(1)})`);sc-=2;}
+    
+    let macd=calcMACD(closes);
+    let prevMACD=calcMACD(closes.slice(0,-1));
+    if(macd.macd>macd.signal&&prevMACD.macd<=prevMACD.signal){sigs.push('تقاطع طلایی MACD');sc+=3;}
+    else if(macd.macd<macd.signal&&prevMACD.macd>=prevMACD.signal){sigs.push('تقاطع مرگ MACD');sc-=3;}
+    
+    let bb=calcBB(closes);
+    if(latest.close<=bb.lower){sigs.push('کف بولینگر');sc+=3;}
+    else if(latest.close>=bb.upper){sigs.push('سقف بولینگر');sc-=3;}
+    
+    let ma5=calcMA(closes,5),ma20=calcMA(closes,20);
+    let prevMA5=calcMA(closes.slice(0,-1),5),prevMA20=calcMA(closes.slice(0,-1),20);
+    if(ma5>ma20&&prevMA5<=prevMA20){sigs.push('تقاطع MA5/20');sc+=2;}
+    else if(ma5<ma20&&prevMA5>=prevMA20){sigs.push('مرگ MA5/20');sc-=2;}
+    
+    sc=Math.max(-10,Math.min(10,sc));
+    let action;
+    if(sc>=6)action='🟢 خرید قوی';
+    else if(sc>=3)action='🟢 خرید';
+    else if(sc>=1)action='🟡 متمایل به خرید';
+    else if(sc<=-6)action='🔴 فروش قوی';
+    else if(sc<=-3)action='🔴 فروش';
+    else if(sc<=-1)action='🟠 متمایل به فروش';
+    else action='⚪ خنثی';
+    
+    return{action,score:sc,signals:sigs,rsi,price:latest.close};
+}
+
+async function fetchSymbols(){
+    try{
+        let r=await fetch('http://cdn.tsetmc.com/api/Instrument/GetInstrumentList');
+        let d=await r.json();
+        return d.instrumentList.filter(i=>i.insCode&&i.lVal30).map(i=>({code:i.insCode,symbol:i.lVal30.trim(),name:(i.lVal18AFC||i.lVal30).trim()}));
+    }catch(e){return[];}
+}
+
+async function fetchData(code){
+    try{
+        let r=await fetch(`http://cdn.tsetmc.com/api/ClosingPrice/GetClosingPriceHistory/${code}`);
+        let d=await r.json();
+        if(d&&d.closingPriceHistory)return d.closingPriceHistory.map(i=>({date:i.dEven,close:parseFloat(i.pClosing),high:parseFloat(i.priceMax),low:parseFloat(i.priceMin),volume:parseFloat(i.qTotTran5J)}));
+    }catch(e){}
+    return null;
+}
+
+async function scanMarket(){
+    document.getElementById('signalsContainer').innerHTML='<div class="loading"><div class="spinner"></div><p style="margin-top:20px;">در حال تحلیل بازار...</p></div>';
+    let symbols=await fetchSymbols();
+    if(!symbols||!symbols.length){document.getElementById('signalsContainer').innerHTML='<p style="text-align:center;color:red;">❌ خطا</p>';return;}
+    let goldKw=['طلا','نقره','زر','گوهر','کهربا','تابان','لوتوس','آلتون','عیار','شمش','مثقال','سکه','گنج','داریک','کیان'];
+    allSignals=[];
+    let total=Math.min(symbols.length,300);
+    for(let i=0;i<total;i++){
+        let sym=symbols[i];
+        let df=await fetchData(sym.code);
+        if(df&&df.length>=50){
+            let result=analyze(df);
+            if(Math.abs(result.score)>=2){
+                allSignals.push({symbol:sym.symbol,name:sym.name.substring(0,35),isGold:goldKw.some(k=>sym.name.includes(k)||sym.symbol.includes(k)),price:result.price,rsi:result.rsi,action:result.action,score:result.score,signals:result.signals});
+            }
+        }
+        if(i%30===0){
+            document.getElementById('signalsContainer').innerHTML=`<div class="loading"><div class="spinner"></div><p style="margin-top:20px;">تحلیل ${i+1} از ${total}...<br>${sym.symbol}</p></div>`;
+            await new Promise(r=>setTimeout(r,10));
+        }
+    }
+    allSignals.sort((a,b)=>b.score-a.score);
+    document.getElementById('updateTime').textContent=`🕒 ${new Date().toLocaleTimeString('fa-IR')} | ${allSignals.length} سیگنال`;
+    renderSignals();
+}
+
+function renderSignals(){
+    let filtered=allSignals;
+    if(currentTab==='gold')filtered=allSignals.filter(s=>s.isGold);
+    else if(currentTab==='buy')filtered=allSignals.filter(s=>s.score>0);
+    else if(currentTab==='sell')filtered=allSignals.filter(s=>s.score<0);
+    let search=document.getElementById('search').value.toUpperCase();
+    if(search)filtered=filtered.filter(s=>s.symbol.toUpperCase().includes(search)||s.name.includes(search));
+    if(!filtered.length){document.getElementById('signalsContainer').innerHTML='<p style="text-align:center;padding:40px;">سیگنالی یافت نشد</p>';return;}
+    let html='';
+    filtered.forEach(s=>{
+        let cls=s.isGold?'gold':s.score>=3?'buy':s.score<=-3?'sell':'neutral';
+        let icon=s.isGold?'🥇':'';
+        html+=`<div class="signal-box ${cls}"><div><div class="symbol">${icon} ${s.symbol}</div><div class="price">${s.name} | 💰 ${s.price?Number(s.price).toLocaleString('fa-IR'):'---'} | RSI: ${s.rsi?s.rsi.toFixed(1):'-'}</div><div style="font-size:12px;margin-top:5px;opacity:0.7;">${s.signals.join(' | ')}</div></div><div style="text-align:center;"><div class="signal">${s.action}</div><div class="score">${s.score>0?'+':''}${s.score}</div></div></div>`;
+    });
+    document.getElementById('signalsContainer').innerHTML=html;
+}
+
+function switchTab(tab){currentTab=tab;document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));event.target.classList.add('active');renderSignals();}
+function filterSignals(){renderSignals();}
+</script>
+</body>
+</html>
