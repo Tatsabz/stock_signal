@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سیگنال هوشمند بورس</title>
+    <title>سیگنال بورس</title>
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:Tahoma;background:#0a0a0a;color:#fff}
@@ -12,7 +12,7 @@
         .login button{width:100%;padding:12px;background:#FFD700;color:#000;border:none;border-radius:8px;font-weight:bold;cursor:pointer;margin-top:10px}
         .container{max-width:900px;margin:0 auto;padding:10px;display:none}
         .header{text-align:center;padding:15px;background:#1a1a1a;border-radius:10px;margin-bottom:10px}
-        .header h1{color:#FFD700;font-size:1.4em}
+        .header h1{color:#FFD700;font-size:1.3em}
         .tabs{display:flex;gap:5px;margin:10px 0;flex-wrap:wrap}
         .tab{padding:8px 12px;background:#1a1a1a;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px}
         .tab.active{background:#FFD700;color:#000;font-weight:bold}
@@ -31,16 +31,14 @@
         .refresh-btn{position:fixed;bottom:20px;right:20px;width:45px;height:45px;background:#FFD700;border:none;border-radius:50%;font-size:20px;cursor:pointer;z-index:100}
         .search{width:100%;padding:10px;background:#1a1a1a;border:1px solid #333;color:#fff;border-radius:8px;margin:8px 0}
         .portfolio-item{background:#1a1a1a;padding:12px;border-radius:8px;margin:6px 0;border:1px solid #333}
-        .portfolio-item .actions{display:flex;gap:5px;margin-top:8px}
-        .portfolio-item button{background:#FFD700;color:#000;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px}
-        .alert-green{color:#15a36e;font-weight:bold}
-        .alert-red{color:#d32f2f;font-weight:bold}
+        .portfolio-item button{background:#d32f2f;color:#fff;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;margin-top:5px}
+        .green{color:#15a36e}.red{color:#d32f2f}
     </style>
 </head>
 <body>
 
 <div class="login" id="loginBox">
-    <h2 style="color:#FFD700;margin-bottom:20px;">🔒 سیگنال هوشمند بورس</h2>
+    <h2 style="color:#FFD700;margin-bottom:20px;">🔒 سیگنال بورس</h2>
     <input type="text" id="user" placeholder="نام کاربری">
     <input type="password" id="pass" placeholder="رمز عبور">
     <button onclick="login()">ورود</button>
@@ -49,17 +47,19 @@
 
 <div class="container" id="app">
     <div class="header">
-        <h1>📈 سیگنال هوشمند بورس ایران</h1>
+        <h1>📈 سیگنال هوشمند بورس</h1>
         <p id="updateTime" style="font-size:11px;opacity:0.7"></p>
     </div>
     
     <div class="tabs">
-        <button class="tab active" onclick="switchTab('scan')">🔍 اسکن بازار</button>
-        <button class="tab" onclick="switchTab('portfolio')">💼 سبد من</button>
-        <button class="tab" onclick="switchTab('add')">➕ افزودن به سبد</button>
+        <button class="tab active" onclick="switchTab('all')">همه</button>
+        <button class="tab" onclick="switchTab('gold')">🥇 طلا</button>
+        <button class="tab" onclick="switchTab('buy')">🟢 خرید</button>
+        <button class="tab" onclick="switchTab('sell')">🔴 فروش</button>
+        <button class="tab" onclick="switchTab('portfolio')">💼 سبد</button>
     </div>
     
-    <input type="text" class="search" id="search" placeholder="🔍 جستجوی نماد..." oninput="filterSignals()" id="searchBox">
+    <input type="text" class="search" id="search" placeholder="🔍 جستجوی نماد..." oninput="filterSignals()">
     
     <div id="contentArea">
         <div class="loading"><div class="spinner"></div><p style="margin-top:20px;">در حال تحلیل بازار...</p></div>
@@ -72,7 +72,8 @@
 const PASS = "Tatsabz#2026";
 const USER = "admin";
 let allSignals = [];
-let portfolio = JSON.parse(localStorage.getItem('portfolio') || '[]');
+let currentTab = 'all';
+let portfolio = JSON.parse(localStorage.getItem('port') || '[]');
 
 function login(){
     if(document.getElementById('user').value===USER && document.getElementById('pass').value===PASS){
@@ -87,8 +88,7 @@ function calcRSI(c,p=14){
     if(c.length<p+1)return 50;
     let g=0,l=0;
     for(let i=c.length-p;i<c.length;i++){let d=c[i]-c[i-1];if(d>0)g+=d;else l-=d;}
-    let ag=g/p,al=l/p;
-    if(al===0)return 100;
+    let ag=g/p,al=l/p;if(al===0)return 100;
     return 100-(100/(1+ag/al));
 }
 function calcMA(c,p){return c.length<p?c[c.length-1]:c.slice(-p).reduce((a,b)=>a+b,0)/p;}
@@ -110,7 +110,7 @@ function calcBB(c,p=20){
 }
 
 function analyze(df){
-    if(!df||df.length<50)return{action:'⚪ ناکافی',score:0,signals:[],rsi:50,price:0,target:0,stop:0};
+    if(!df||df.length<50)return{action:'⚪ ناکافی',score:0,signals:[],rsi:50,price:0};
     let c=df.map(d=>d.close),lt=df[df.length-1],sig=[],sc=0;
     
     let rsi=calcRSI(c);
@@ -132,7 +132,7 @@ function analyze(df){
     else if(ma5<ma20&&pma5>=pma20){sig.push('مرگ MA5/20');sc-=2;}
     
     sc=Math.max(-10,Math.min(10,sc));
-    let action,atr=(lt.high-lt.low)*0.02||lt.close*0.03;
+    let action;
     if(sc>=6)action='🟢 خرید قوی';
     else if(sc>=3)action='🟢 خرید';
     else if(sc>=1)action='🟡 متمایل به خرید';
@@ -141,40 +141,57 @@ function analyze(df){
     else if(sc<=-1)action='🟠 متمایل به فروش';
     else action='⚪ خنثی';
     
-    return{action,score:sc,signals:sig,rsi,price:lt.close,target:lt.close*1.05,stop:lt.close*0.95};
+    return{action,score:sc,signals:sig,rsi,price:lt.close};
 }
 
 async function fetchSymbols(){
-    try{
-        let r=await fetch('https://api.allorigins.win/raw?url=http://cdn.tsetmc.com/api/Instrument/GetInstrumentList');
-        let d=await r.json();
-        return d.instrumentList.filter(i=>i.insCode&&i.lVal30).map(i=>({code:i.insCode,symbol:i.lVal30.trim(),name:(i.lVal18AFC||i.lVal30).trim()}));
-    }catch(e){return[];}
+    let urls=[
+        'https://cors-anywhere.herokuapp.com/http://cdn.tsetmc.com/api/Instrument/GetInstrumentList',
+        'https://api.allorigins.win/raw?url=http://cdn.tsetmc.com/api/Instrument/GetInstrumentList',
+        'https://corsproxy.io/?http://cdn.tsetmc.com/api/Instrument/GetInstrumentList'
+    ];
+    for(let url of urls){
+        try{
+            let r=await fetch(url);
+            let d=await r.json();
+            if(d&&d.instrumentList)return d.instrumentList.filter(i=>i.insCode&&i.lVal30).map(i=>({code:i.insCode,symbol:i.lVal30.trim(),name:(i.lVal18AFC||i.lVal30).trim()}));
+        }catch(e){}
+    }
+    return[];
 }
+
 async function fetchData(code){
-    try{
-        let r=await fetch(`https://api.allorigins.win/raw?url=http://cdn.tsetmc.com/api/ClosingPrice/GetClosingPriceHistory/${code}`);
-        let d=await r.json();
-        if(d&&d.closingPriceHistory)return d.closingPriceHistory.map(i=>({date:i.dEven,close:parseFloat(i.pClosing),high:parseFloat(i.priceMax),low:parseFloat(i.priceMin),volume:parseFloat(i.qTotTran5J)}));
-    }catch(e){}
+    let urls=[
+        `https://cors-anywhere.herokuapp.com/http://cdn.tsetmc.com/api/ClosingPrice/GetClosingPriceHistory/${code}`,
+        `https://api.allorigins.win/raw?url=http://cdn.tsetmc.com/api/ClosingPrice/GetClosingPriceHistory/${code}`,
+        `https://corsproxy.io/?http://cdn.tsetmc.com/api/ClosingPrice/GetClosingPriceHistory/${code}`
+    ];
+    for(let url of urls){
+        try{
+            let r=await fetch(url);
+            let d=await r.json();
+            if(d&&d.closingPriceHistory)return d.closingPriceHistory.map(i=>({date:i.dEven,close:parseFloat(i.pClosing),high:parseFloat(i.priceMax),low:parseFloat(i.priceMin),volume:parseFloat(i.qTotTran5J)}));
+        }catch(e){}
+    }
     return null;
 }
 
 async function scanMarket(){
     document.getElementById('contentArea').innerHTML='<div class="loading"><div class="spinner"></div><p style="margin-top:20px;">در حال تحلیل بازار...</p></div>';
     let syms=await fetchSymbols();
-    if(!syms||!syms.length){document.getElementById('contentArea').innerHTML='<p style="text-align:center;color:red;padding:40px;">❌ خطا در دریافت داده - فیلترشکن را روشن کنید</p>';return;}
+    if(!syms||!syms.length){document.getElementById('contentArea').innerHTML='<p style="text-align:center;color:red;padding:40px;">❌ خطا - فیلترشکن را روشن کنید</p>';return;}
     let gk=['طلا','نقره','زر','گوهر','کهربا','تابان','لوتوس','آلتون','عیار','شمش','مثقال','سکه','گنج','داریک','کیان'];
     allSignals=[];
-    for(let i=0;i<Math.min(syms.length,300);i++){
+    let total=Math.min(syms.length,200);
+    for(let i=0;i<total;i++){
         let s=syms[i],df=await fetchData(s.code);
         if(df&&df.length>=50){
             let r=analyze(df);
             if(Math.abs(r.score)>=2){
-                allSignals.push({symbol:s.symbol,name:s.name.substring(0,35),isGold:gk.some(k=>s.name.includes(k)||s.symbol.includes(k)),price:r.price,rsi:r.rsi,action:r.action,score:r.score,signals:r.signals,target:r.target,stop:r.stop,code:s.code});
+                allSignals.push({symbol:s.symbol,name:s.name.substring(0,35),isGold:gk.some(k=>s.name.includes(k)||s.symbol.includes(k)),price:r.price,rsi:r.rsi,action:r.action,score:r.score,signals:r.signals,code:s.code});
             }
         }
-        if(i%50===0)document.getElementById('contentArea').innerHTML=`<div class="loading"><div class="spinner"></div><p style="margin-top:20px;">تحلیل ${i+1} از ${Math.min(syms.length,300)}...<br>${s.symbol}</p></div>`;
+        if(i%30===0)document.getElementById('contentArea').innerHTML=`<div class="loading"><div class="spinner"></div><p style="margin-top:20px;">تحلیل ${i+1} از ${total}...<br>${s.symbol}</p></div>`;
     }
     allSignals.sort((a,b)=>b.score-a.score);
     document.getElementById('updateTime').textContent=`🕒 ${new Date().toLocaleTimeString('fa-IR')} | ${allSignals.length} سیگنال`;
@@ -183,92 +200,40 @@ async function scanMarket(){
 
 function renderSignals(){
     let f=allSignals,s=document.getElementById('search').value.toUpperCase();
+    if(currentTab==='gold')f=f.filter(x=>x.isGold);
+    else if(currentTab==='buy')f=f.filter(x=>x.score>0);
+    else if(currentTab==='sell')f=f.filter(x=>x.score<0);
+    else if(currentTab==='portfolio'){renderPortfolio();return;}
     if(s)f=f.filter(x=>x.symbol.toUpperCase().includes(s)||x.name.includes(s));
     if(!f.length){document.getElementById('contentArea').innerHTML='<p style="text-align:center;padding:40px;">سیگنالی یافت نشد</p>';return;}
     let h='';
     f.forEach(x=>{
         let cls=x.isGold?'gold':x.score>=3?'buy':x.score<=-3?'sell':'neutral';
-        h+=`<div class="signal-box ${cls}">
-            <div>
-                <div class="symbol">${x.isGold?'🥇':''} ${x.symbol} <span style="font-size:11px;opacity:0.7">${x.name}</span></div>
-                <div class="price">💰 ${x.price?Number(x.price).toLocaleString('fa-IR'):'---'} | RSI: ${x.rsi?.toFixed(1)} | 🎯 هدف: ${Number(x.target).toLocaleString('fa-IR')} | 🛑 ضرر: ${Number(x.stop).toLocaleString('fa-IR')}</div>
-                <div style="font-size:11px;opacity:0.7;margin-top:3px;">${x.signals.join(' | ')}</div>
-            </div>
-            <div style="text-align:center;">
-                <div class="signal">${x.action}</div>
-                <div class="score">${x.score>0?'+':''}${x.score}</div>
-                <button style="background:#FFD700;color:#000;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:10px;margin-top:5px;" onclick="addToPortfolio('${x.symbol}',${x.price},${x.target},${x.stop})">➕ سبد</button>
-            </div>
-        </div>`;
+        h+=`<div class="signal-box ${cls}"><div><div class="symbol">${x.isGold?'🥇':''} ${x.symbol} <span style="font-size:11px;opacity:0.7">${x.name}</span></div><div class="price">💰 ${x.price?Number(x.price).toLocaleString('fa-IR'):'---'} | RSI: ${x.rsi?.toFixed(1)}</div><div style="font-size:11px;opacity:0.7;margin-top:3px;">${x.signals.join(' | ')}</div></div><div style="text-align:center;"><div class="signal">${x.action}</div><div class="score">${x.score>0?'+':''}${x.score}</div><button style="background:#FFD700;color:#000;border:none;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:10px;margin-top:5px;" onclick="addToPort('${x.symbol}',${x.price})">➕</button></div></div>`;
     });
     document.getElementById('contentArea').innerHTML=h;
 }
 
-function addToPortfolio(sym,price,target,stop){
-    let qty=prompt(`تعداد ${sym} را وارد کنید:`,`1`);
-    if(!qty)return;
-    portfolio.push({symbol:sym,buyPrice:price,quantity:parseInt(qty),target:target,stop:stop,date:new Date().toLocaleDateString('fa-IR')});
-    localStorage.setItem('portfolio',JSON.stringify(portfolio));
-    alert(`✅ ${sym} به سبد اضافه شد`);
-}
-
-function switchTab(tab){
-    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-    event.target.classList.add('active');
-    if(tab==='scan'){document.getElementById('search').style.display='block';renderSignals();}
-    else if(tab==='portfolio'){document.getElementById('search').style.display='none';renderPortfolio();}
-    else if(tab==='add'){document.getElementById('search').style.display='none';renderAddForm();}
+function addToPort(sym,price){
+    let q=prompt(`تعداد ${sym}:`,'1');if(!q)return;
+    let t=prompt('هدف فروش:',Math.round(price*1.1));
+    let st=prompt('حد ضرر:',Math.round(price*0.9));
+    portfolio.push({symbol:sym,buyPrice:price,quantity:parseInt(q),target:parseInt(t),stop:parseInt(st),date:new Date().toLocaleDateString('fa-IR')});
+    localStorage.setItem('port',JSON.stringify(portfolio));
+    alert(`✅ ${sym} اضافه شد`);
 }
 
 function renderPortfolio(){
     if(!portfolio.length){document.getElementById('contentArea').innerHTML='<p style="text-align:center;padding:40px;">سبد خالی است</p>';return;}
-    let h='<h3 style="color:#FFD700;margin-bottom:15px;">💼 سبد سهام شما</h3>';
+    let h='<h3 style="color:#FFD700;margin-bottom:15px;">💼 سبد سهام</h3>';
     portfolio.forEach((p,i)=>{
-        let profit=(p.target-p.buyPrice)*p.quantity;
-        let loss=(p.buyPrice-p.stop)*p.quantity;
-        h+=`<div class="portfolio-item">
-            <strong>${p.symbol}</strong> | تعداد: ${p.quantity} | خرید: ${Number(p.buyPrice).toLocaleString('fa-IR')}
-            <div style="margin-top:5px;font-size:13px;">
-                🎯 هدف فروش: <span class="alert-green">${Number(p.target).toLocaleString('fa-IR')}</span> | سود: <span class="alert-green">+${Number(profit).toLocaleString('fa-IR')}</span>
-                <br>🛑 حد ضرر: <span class="alert-red">${Number(p.stop).toLocaleString('fa-IR')}</span> | ضرر: <span class="alert-red">-${Number(loss).toLocaleString('fa-IR')}</span>
-                <br>📅 تاریخ خرید: ${p.date}
-            </div>
-            <div class="actions">
-                <button onclick="removeFromPortfolio(${i})">🗑️ حذف</button>
-            </div>
-        </div>`;
+        h+=`<div class="portfolio-item"><strong>${p.symbol}</strong> | تعداد: ${p.quantity} | خرید: ${Number(p.buyPrice).toLocaleString('fa-IR')}<br>🎯 هدف: <span class="green">${Number(p.target).toLocaleString('fa-IR')}</span> | 🛑 ضرر: <span class="red">${Number(p.stop).toLocaleString('fa-IR')}</span> | 📅 ${p.date}<br><button onclick="removeFromPort(${i})">🗑️ حذف</button></div>`;
     });
     document.getElementById('contentArea').innerHTML=h;
 }
 
-function renderAddForm(){
-    document.getElementById('contentArea').innerHTML=`
-        <div style="background:#1a1a1a;padding:20px;border-radius:10px;">
-            <h3 style="color:#FFD700;margin-bottom:15px;">➕ افزودن دستی به سبد</h3>
-            <input type="text" id="addSymbol" placeholder="نماد سهم" style="width:100%;padding:10px;margin:5px 0;background:#000;border:1px solid #333;color:#fff;border-radius:8px;">
-            <input type="number" id="addPrice" placeholder="قیمت خرید" style="width:100%;padding:10px;margin:5px 0;background:#000;border:1px solid #333;color:#fff;border-radius:8px;">
-            <input type="number" id="addQty" placeholder="تعداد" value="1" style="width:100%;padding:10px;margin:5px 0;background:#000;border:1px solid #333;color:#fff;border-radius:8px;">
-            <input type="number" id="addTarget" placeholder="هدف فروش" style="width:100%;padding:10px;margin:5px 0;background:#000;border:1px solid #333;color:#fff;border-radius:8px;">
-            <input type="number" id="addStop" placeholder="حد ضرر" style="width:100%;padding:10px;margin:5px 0;background:#000;border:1px solid #333;color:#fff;border-radius:8px;">
-            <button onclick="addManual()" style="width:100%;padding:12px;background:#FFD700;color:#000;border:none;border-radius:8px;font-weight:bold;cursor:pointer;margin-top:10px;">افزودن</button>
-        </div>`;
-}
-
-function addManual(){
-    let s=document.getElementById('addSymbol').value.toUpperCase();
-    let p=parseInt(document.getElementById('addPrice').value);
-    let q=parseInt(document.getElementById('addQty').value);
-    let t=parseInt(document.getElementById('addTarget').value);
-    let st=parseInt(document.getElementById('addStop').value);
-    if(s&&p&&q){
-        portfolio.push({symbol:s,buyPrice:p,quantity:q,target:t||p*1.1,stop:st||p*0.9,date:new Date().toLocaleDateString('fa-IR')});
-        localStorage.setItem('portfolio',JSON.stringify(portfolio));
-        alert(`✅ ${s} اضافه شد`);
-        renderAddForm();
-    }
-}
-
-function removeFromPortfolio(i){portfolio.splice(i,1);localStorage.setItem('portfolio',JSON.stringify(portfolio));renderPortfolio();}
+function removeFromPort(i){portfolio.splice(i,1);localStorage.setItem('port',JSON.stringify(portfolio));renderPortfolio();}
+function switchTab(tab){currentTab=tab;document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));event.target.classList.add('active');renderSignals();}
 function filterSignals(){renderSignals();}
 </script>
 </body>
